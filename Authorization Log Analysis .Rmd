@@ -1,0 +1,133 @@
+---
+title: "Authorization Log Analysis"
+output: pdf_document
+---
+
+#If packages are not installed on your computer, need to uncomment and install the following packages. 
+#install.packages("readxl")
+#install.packages("readr")
+#install.packages("tidyverse")
+#install.packages("ggplot2")
+#install.packages("igraph")
+#install.packages("dplyr")
+#install.packages("plyr")
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(stringr)
+library(tidyverse)
+library(ggplot2)
+library(igraph)
+library(dplyr)
+library(plyr)
+```   
+   
+#Authorization Log Analysis 
+
+This analysis started on August 24th 2018. There are 37 variables and 785 observations. This data set contains all the Authorization Logs the PMO has ever authorized, both active and inactive, as well as re-used authorizations.    
+   
+*Questions to answer:*    
+    
+Total Number of authorizations   
+* Overall     
+* By Year   
+* Active / Inactive authorizations (as of today)   
+* JAB v. Agency authorizations:    
+  + Active / Inactive (as of today)    
+* By Deployment Model - Column M    
+* Active / Inactive (as of today)    
+* By Impact Level - Column N    
+* Active / Inactive (as of today)    
+* By Service Model - Column D    
+* By Whether the Agency is part of the CFO Act - Column V    
+* Those that were FR Ready First - Column AK   
+  + You will need to use the dates here to tell if they were FR Ready First   
+* Authorizations by Agencies   
+  + Note: Use the Tier1 Agency listed    
+     
+##Loading Data    
+   
+```{r}
+library(readxl)
+#Julia Smadja's working directory, what's in quotation marks must changed
+Authorization_Log <- read_excel("Authorization Log (4).xlsx",
+    col_types = c("text", "text", "text", 
+        "text", "text", "text", "text", "date", 
+        "date", "date", "text", "text", "text", 
+        "text", "text", "text", "text", "date", 
+        "text", "text", "text", "text", "text", 
+        "text", "text", "text", "numeric", 
+        "text", "text", "date", "text", "text", 
+        "text", "text", "date", "date", "date", 
+        "text"))
+head(Authorization_Log)
+```
+       
+##Data Cleaning    
+   
+```{r}
+Authorization_Log <- Authorization_Log %>%
+  filter(!is.na(`Fiscal Year`)) %>% #removing when the variable "Fiscal Year" is N/A which means the the authorizations is still in process
+  mutate(Fiscal_Year = str_split_fixed(`Fiscal Year`, 4)) %>%
+  select(`Fiscal_Year_ID` = `Fiscal Year`, 
+         Fiscal_Year, CSP, CSO, 
+         `Service_Model` = `Service Model`,
+         `Package_ID` = PackageID,
+         Path, 
+         `Leverage_ATO-YN` = `Leverage ATO-YN`, 
+         `Authorization_Date` = `Authorization Date`, 
+         `Authorizing_Letter_Date` = `Authorizing Letter Date`, 
+         `Authorizing_Letter_Last_Sign_Date` = `Authorizing Letter Last Sign Date`, 
+         `Active-Inactive`, Designation, 
+         `Deployment_Model` = `Deployment Model`, 
+         `Impact_Level` = `Impact Level`, 
+         `Authorizing_Agency` = `Authorizing Agency`, 
+         `Authorizing_Subagency` = `Authorizing Subagency`, 
+         `Authorizing_Official` = `Authorizing Official`, 
+         Expiration, 
+         `Sponsoring_Agency` = `Sponsoring Agency`, 
+         `MAX_Folder_Link` = `MAX Folder Link`, 
+         `Letter_Link` = `Letter Link`, 
+         `CFO_Act_Agency` = `CFO Act Agency`, 
+         `CSP_POC` = `CSP POC`, 
+         `CSP_POC_Email` = `CSP POC Email`, 
+         `CSP_Website` = `CSP Website`, 
+         `Agency_POC` = `Agency POC`, 
+         `Agency_POC_Email` = `Agency POC Email`, 
+         `Independent_Assessor` = `Independent Assessor`, 
+         `Package_Service_Description` = `Package Service Description`, 
+         `Announcement_Date` = `Announcement Date`, 
+         Comment, 
+         `Include_In_MarketplaceYN?` = `Include In MarketplaceYN?`, 
+         `Logo_File_URL` = `Logo File URL`, 
+         `Underlying_CSPs` = `Underlying CSPs`, 
+         `Expected_Compliance_Date` = `Expected Compliance Date`, 
+         `FedRAMP_Ready_Date` = `FedRAMP Ready Date`, 
+         `FedRAMP_In-Process_Date` = `FedRAMP In-Process Date`, 
+         `Agency_Logo_URL` = `Agency Logo URL`)
+Authorization_Log
+```
+   
+    
+##Data Analysis    
+   
+**Overall Total Number of Authorizations**   
+  
+```{r}
+ATO_count <- Authorization_Log %>%
+  summarise(length(`Fiscal Year`)) #getting the count
+
+ATO_count
+```    
+   
+There is a total of 785 authorizations.     
+   
+**Total Number of Authorizations by Year**    
+   
+```{r}
+ATO_year_count <- Authorization_Log %>%
+  group_by()
+  summarise(length(`Fiscal Year`))
+```
+
+
