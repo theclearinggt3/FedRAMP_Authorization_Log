@@ -3,23 +3,25 @@ title: "Authorization Log Analysis"
 output: pdf_document
 ---
 
-#If packages are not installed on your computer, need to uncomment and install the following packages. 
-#install.packages("readxl")
-#install.packages("readr")
-#install.packages("tidyverse")
-#install.packages("ggplot2")
-#install.packages("igraph")
-#install.packages("dplyr")
-#install.packages("plyr")
+If packages are not installed on your computer, need to uncomment and install the following packages. 
+install.packages("readxl")
+install.packages("stringr")
+install.packages("tidyverse")
+install.packages("ggplot2")
+install.packages("dplyr")
+install.packages("plyr")
+install.packages("lubridate") 
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+#Loading the different libraries needed. If they are not installed see comment above. 
 library(stringr)
 library(tidyverse)
 library(ggplot2)
-library(igraph)
 library(dplyr)
 library(plyr)
+library(lubridate)
 ```   
    
 #Authorization Log Analysis 
@@ -34,13 +36,13 @@ Total Number of authorizations
 * Active / Inactive authorizations (as of today)   
 * JAB v. Agency authorizations:    
   + Active / Inactive (as of today)    
-* By Deployment Model - Column M    
-* Active / Inactive (as of today)    
+* By Deployment Model - Column M       
+  + Active / Inactive (as of today)    
 * By Impact Level - Column N    
-* Active / Inactive (as of today)    
+  + Active / Inactive (as of today)    
 * By Service Model - Column D    
 * By Whether the Agency is part of the CFO Act - Column V    
-* Those that were FR Ready First - Column AK   
+* Those that were FR Ready First, were Compliant and Active vs. Inactive - Column AK   
   + You will need to use the dates here to tell if they were FR Ready First   
 * Authorizations by Agencies   
   + Note: Use the Tier1 Agency listed    
@@ -50,17 +52,8 @@ Total Number of authorizations
 ```{r}
 library(readxl)
 #Julia Smadja's working directory, what's in quotation marks must changed
-Authorization_Log <- read_excel("Authorization Log (4).xlsx",
-    col_types = c("text", "text", "text", 
-        "text", "text", "text", "text", "date", 
-        "date", "date", "text", "text", "text", 
-        "text", "text", "text", "text", "date", 
-        "text", "text", "text", "text", "text", 
-        "text", "text", "text", "numeric", 
-        "text", "text", "date", "text", "text", 
-        "text", "text", "date", "date", "date", 
-        "text"))
-head(Authorization_Log)
+Authorization_Log <- read_excel("Authorization Log (4).xlsx")
+head(Authorization_Log) #seeing the first five rows of the data 
 ```
        
 ##Data Cleaning    
@@ -68,7 +61,7 @@ head(Authorization_Log)
 ```{r}
 Authorization_Log <- Authorization_Log %>%
   filter(!is.na(`Fiscal Year`)) %>% #removing when the variable "Fiscal Year" is N/A which means the the authorizations is still in process
-  mutate(Fiscal_Year = str_split_fixed(`Fiscal Year`, 4)) %>%
+  mutate(Fiscal_Year = `Fiscal Year`) %>% #creating the duplicate of "Fiscal Year" to manipulate in the future 
   select(`Fiscal_Year_ID` = `Fiscal Year`, 
          Fiscal_Year, CSP, CSO, 
          `Service_Model` = `Service Model`,
@@ -104,7 +97,19 @@ Authorization_Log <- Authorization_Log %>%
          `Expected_Compliance_Date` = `Expected Compliance Date`, 
          `FedRAMP_Ready_Date` = `FedRAMP Ready Date`, 
          `FedRAMP_In-Process_Date` = `FedRAMP In-Process Date`, 
-         `Agency_Logo_URL` = `Agency Logo URL`)
+         `Agency_Logo_URL` = `Agency Logo URL`) %>% #renaming variables so they have underscores
+  separate(Fiscal_Year, into = c("Fiscal_Year", "Number"), convert = TRUE) %>% #changing the values of "Fiscal_Year" to only have FY13, FY14, FY15, FY16, FY17, and FY18
+  select(-Number) #removing the created variable "Number" which is unecessary for the analysis 
+
+#changing the data type so date variables are considered as date and not character 
+Authorization_Log$Authorization_Date <- ymd(Authorization_Log$Authorization_Date)
+Authorization_Log$Authorizing_Letter_Date <- ymd(Authorization_Log$Authorizing_Letter_Date)
+Authorization_Log$Authorizing_Letter_Last_Sign_Date <- ymd(Authorization_Log$Authorizing_Letter_Last_Sign_Date)
+Authorization_Log$Announcement_Date <- ymd(Authorization_Log$Announcement_Date)
+Authorization_Log$Expected_Compliance_Date <- ymd(Authorization_Log$Expected_Compliance_Date)
+Authorization_Log$FedRAMP_Ready_Date <- ymd(Authorization_Log$FedRAMP_Ready_Date)
+Authorization_Log$`FedRAMP_In-Process_Date` <- ymd(Authorization_Log$`FedRAMP_In-Process_Date`)
+
 Authorization_Log
 ```
    
@@ -114,8 +119,10 @@ Authorization_Log
 **Overall Total Number of Authorizations**   
   
 ```{r}
+detach("package:plyr", unload=TRUE) 
+library(dplyr)
 ATO_count <- Authorization_Log %>%
-  summarise(length(`Fiscal Year`)) #getting the count
+  summarize(length(Fiscal_Year_ID)) #getting the count
 
 ATO_count
 ```    
@@ -126,8 +133,182 @@ There is a total of 785 authorizations.
    
 ```{r}
 ATO_year_count <- Authorization_Log %>%
-  group_by()
-  summarise(length(`Fiscal Year`))
-```
+  group_by(Fiscal_Year) %>% #grouping by Fiscal_Year
+  summarize(n_Authorizations = n()) #getting the count 
 
+ATO_year_count
+```   
+   
+We can see a clear increase in number of authorizations per year. However, in FY18 there are less authorizations than FY17. 
+    
+**Total Number of Authorizations that are Active/Inactive**    
+   
+```{r}
+ATO_AvsI_count <- Authorization_Log %>%
+  group_by(`Active-Inactive`) %>% #grouping by Active-Inactive 
+  summarize(n_Authorizations = n()) #getting the count 
+
+ATO_AvsI_count
+```    
+   
+There are 550 active authorizations and 235 inactive authorizations.
+
+**Total number of Authorizations that are Active/Inactive by Path**    
+   
+```{r}
+ATO_Path_AvsI_count <- Authorization_Log %>%
+  group_by(Path, `Active-Inactive`) %>% #grouping by Path and then by Active-Inactive 
+  summarize(n_Authorizations = n()) #getting the count 
+
+ATO_Path_AvsI_count
+```    
+       
+There were a total of 261 Active authorizations and 127 Inactive authorizations when it was an Agency path. There were a total of 289 Active authorizations and 101 Inactive authorizations when it was a JAB path. The CSP path, should be considered apart of the Agency path and all 7 are Inactive.               
+          
+**Total Number of Authorizations by Deployment Model**     
+   
+```{r}
+ATO_DM_count <- Authorization_Log %>%
+  group_by(Deployment_Model) %>% #grouping by Deployment_Model 
+  summarize(n_Authorizations = n()) #getting the count 
+
+ATO_DM_count
+```    
+     
+The total number of authorizations is 313 when government community cloud is the deployment model, it is 123 when hybrid cloud is the deployment model, it is 27 when private cloud is the deployment model and it is 321 when public cloud is the deployment model. There is 1 N/A. 
+
+**Total Number of Authorizations that are Active/Inactive by Deployment Model**     
+    
+```{r}
+ATO_DM_AvsI_count <- Authorization_Log %>%
+  group_by(Deployment_Model, `Active-Inactive`) %>% #grouping by Deployment_Model and then by Active-Inactive
+  summarize(n_Authorizations = n()) #getting the count 
+
+ATO_DM_AvsI_count
+```
+      
+The total number of active authorizations is 231 and inactive authorizations is 82 when government community cloud is the deployment model. The total number of active authorizations is 79 and inactive authorizations is 44 when hybrid cloud is the deployment model. The total number of active authorizations is 19 and inactive authorizations is 8 when private cloud is the deployment model. The total number of active authorizations is 221 and inactive authorizations is 100 when public cloud is the deployment model. There is 1 inactive authorizations that is N/A.        
+ 
+**Total Number of Authorizations by Impact Level**   
+  
+```{r}
+ATO_IL_count <- Authorization_Log %>%
+  group_by(Impact_Level) %>% #grouping by Impact_Level
+  summarize(n_Authorizations = n()) #getting the count 
+
+ATO_IL_count
+```   
+    
+There are 53 high impact level authorizations. Thre are 723 moderate impact level authorizations and 1 moderate in process for the high impact level authorization. There are 5 Li-SaaS authorizations and 1 Li-SaaS in process for the moderate impact level authorization. 
+    
+**Total Number of Authorizations that are Active/Inactive by Impact Level**   
+  
+```{r}
+ATO_IL_AvsI_count <- Authorization_Log %>%
+  group_by(Impact_Level, `Active-Inactive`) %>% #grouping by Impact_Level and then by Active-Inactive 
+  summarize(n_Authorizations = n()) #getting the count 
+
+ATO_IL_AvsI_count
+```   
+      
+There are 48 high level active authorizations and 6 inactive. There are 5 Li-SaaS active authorizations. There is 1 Li-SaaS active authorization in process for the moderate impact level. There is 1 low level active authorization. There are 494 moderate level active authorizations and 229 inactive. There is 1 moderate level active authorization in process for the high impact level.         
+           
+**Total Number of Authorizations by Service Model**   
+  
+```{r}
+ATO_SM_count <- Authorization_Log %>%
+  group_by(Service_Model) %>% #grouping by Service_Model 
+  summarize(n_Authorizations = n()) %>% #getting the count 
+  arrange(desc(n_Authorizations)) #arranging to see the largest count first 
+
+ATO_SM_count
+```     
+    
+There are 337 SaaS authorizations, 141 IaaS, 132 IaaS & PaaS, 82 PaaS & SaaS and 62 PaaS.        
+         
+**Total Number of Authorizations by whether the Agency is part of the CFO Act**     
+    
+```{r}
+ATO_CFOActA_count <- Authorization_Log %>%
+  group_by(CFO_Act_Agency) %>% #grouping by CFO_Act_Agency 
+  summarize(n_Authorizations = n()) #getting the count 
+
+ATO_CFOActA_count
+```     
+   
+There are 670 authorizations where the Agency is part of the CFO Act, and 107 authorizations where the Agency is not. 
+   
+**Total Number of Authorizations that were FR Ready First, were Compliant and Active vs. Inactive**   
+     
+```{r}
+ATO_FRReadyFirst_count <- Authorization_Log %>%
+  mutate(FedRAMP_Ready_First = 
+           ifelse(is.na(FedRAMP_Ready_Date) & is.na(`FedRAMP_In-Process_Date`), "NA",
+                  ifelse(is.na(FedRAMP_Ready_Date) & !is.na(`FedRAMP_In-Process_Date`), "FALSE",
+                         ifelse(is.na(`FedRAMP_In-Process_Date`) & !is.na(FedRAMP_Ready_Date), "TRUE",
+                                ifelse(FedRAMP_Ready_Date < `FedRAMP_In-Process_Date`, "TRUE", "FALSE"))))) %>% #creating the variable FedRAMP_Ready_First based on FedRAMP_Ready_Date and FedRAMP_In-Process_Date 
+  group_by(FedRAMP_Ready_First) %>% #grouping by FedRAMP_Ready_First
+  summarize(n_Authorizations = n()) #getting the count 
+
+ATO_FRReadyFirst_count
+
+ATO_FRReadyFirst_Compliant <- Authorization_Log %>%  
+  mutate(FedRAMP_Ready_First = 
+           ifelse(is.na(FedRAMP_Ready_Date) & is.na(`FedRAMP_In-Process_Date`), "NA",
+                  ifelse(is.na(FedRAMP_Ready_Date) & !is.na(`FedRAMP_In-Process_Date`), "FALSE",
+                         ifelse(is.na(`FedRAMP_In-Process_Date`) & !is.na(FedRAMP_Ready_Date), "TRUE",
+                                ifelse(FedRAMP_Ready_Date < `FedRAMP_In-Process_Date`, "TRUE", "FALSE"))))) %>% #creating the variable FedRAMP_Ready_First based on FedRAMP_Ready_Date and FedRAMP_In-Process_Date 
+  filter(FedRAMP_Ready_First == "TRUE" & Designation == "Compliant") #filtering based on if FedRAMP_Ready_First is TRUE and Designation is Compliant 
+
+ATO_FRReadyFirst_Compliant
+
+ATO_FRReadyFirst_Compliant_AvsI_count <- Authorization_Log %>%  
+  mutate(FedRAMP_Ready_First = 
+           ifelse(is.na(FedRAMP_Ready_Date) & is.na(`FedRAMP_In-Process_Date`), "NA",
+                  ifelse(is.na(FedRAMP_Ready_Date) & !is.na(`FedRAMP_In-Process_Date`), "FALSE",
+                         ifelse(is.na(`FedRAMP_In-Process_Date`) & !is.na(FedRAMP_Ready_Date), "TRUE",
+                                ifelse(FedRAMP_Ready_Date < `FedRAMP_In-Process_Date`, "TRUE", "FALSE"))))) %>% #creating the variable FedRAMP_Ready_First based on FedRAMP_Ready_Date and FedRAMP_In-Process_Date 
+  filter(FedRAMP_Ready_First == "TRUE" & Designation == "Compliant") %>% #filtering based on if FedRAMP_Ready_First is TRUE and Designation is Compliant 
+  group_by(`Active-Inactive`) %>% #grouping by Active-Inactive 
+  summarize(n_Authorizations = n()) #getting the count 
+
+ATO_FRReadyFirst_Compliant_AvsI_count
+```        
+    
+There are 28 authorizations that were FedRAMP ready first and 743 that were not.
+    
+**Total Number of Authorizations by Agencies**     
+   
+```{r}
+ATO_Agencies_count <- Authorization_Log %>%
+  group_by(Authorizing_Agency) %>% #grouping by Authorizing_Agency
+  summarize(n_Authorizations = n()) %>% #getting the count 
+  arrange(desc(n_Authorizations)) #arranging to see the largest count first 
+
+ATO_Agencies_count
+```    
+    
+There are 83 authorizations in the department of commerce, 76 in the department of defense, 51 in the department of health and human services, 51 in the department of the treasury and 49 in the department of the interior.         
+          
+##Exporting Data 
+    
+```{r}
+library(openxlsx)
+#exporting the data to make a list with all the data frames created in to the same data set with different sheets
+list_of_datasets <- list("Cleaned" = `Authorization_Log`, 
+                         "ATO_count" = `ATO_count`, 
+                         "ATO_year_count" = `ATO_year_count`, 
+                         "ATO_AvsI_count" = `ATO_AvsI_count`, 
+                         "ATO_Path_AvsI_count" = `ATO_Path_AvsI_count`,
+                         "ATO_DM_count" = `ATO_DM_count`, 
+                         "ATO_DM_AvsI_count" = `ATO_DM_AvsI_count`, 
+                         "ATO_IL_AvsI_count" = `ATO_IL_AvsI_count`, 
+                         "ATO_SM_count" = `ATO_SM_count`, 
+                         "ATO_CFOActA_count" = `ATO_CFOActA_count`, 
+                         "ATO_FRReadyFirst_count" = `ATO_FRReadyFirst_count`, 
+                         "ATO_FRReadyFirst_Compliant" = `ATO_FRReadyFirst_Compliant`, 
+                         "ATO_FRReadyFirst_Compliant_AvsI_count" = `ATO_FRReadyFirst_Compliant_AvsI_count`, 
+                         "ATO_Agencies_count" = `ATO_Agencies_count`) 
+write.xlsx(list_of_datasets, file = "Authorization Log Analysis.xlsx")
+``` 
 
