@@ -61,15 +61,15 @@ Total Number of authorizations
 ```{r}
 library(readxl)
 #Julia Smadja's working directory, what's in quotation marks must changed
-Authorization_Log <- read_excel("Authorization Log (4).xlsx")
-head(Authorization_Log) #seeing the first five rows of the data 
-Authorization_Log
+Authorization_Log_Original <- read_excel("Authorization Log (4).xlsx")
+head(Authorization_Log_Original) #seeing the first five rows of the data 
+Authorization_Log_Original
 ```
        
 ##Data Cleaning    
    
 ```{r}
-Authorization_Log <- Authorization_Log %>%
+Authorization_Log <- Authorization_Log_Original %>%
   filter(!is.na(`Fiscal Year`)) %>% #removing when the variable "Fiscal Year" is N/A which means the authorizations is still in process
   mutate(Fiscal_Year = `Fiscal Year`) %>% #creating the duplicate of "Fiscal Year" to manipulate in the future 
   select(`Fiscal_Year_ID` = `Fiscal Year`, 
@@ -430,14 +430,14 @@ ATO_InitialReuse_Active_Agencies_Count <- Authorization_Log %>%
 
 ATO_InitialReuse_Active_Agencies_Count
 
-ATO__Agencies_SaaS_Count <- Authorization_Log %>%
+ATO_Agencies_SaaS_Count <- Authorization_Log %>%
   group_by(Authorizing_Agency) %>% #grouping by Authorizing_Agency
   filter(Service_Model == "SaaS") %>% #filtering to only have active authorizations
   summarize(n_Authorizations = n()) %>% #getting the count 
   arrange(desc(n_Authorizations)) %>% #arranging to see the largest count first 
   top_n(10)
 
-ATO__Agencies_SaaS_Count
+ATO_Agencies_SaaS_Count
 ```    
     
 There are 83 authorizations in the department of commerce, 76 in the department of defense, 51 in the department of health and human services, 51 in the department of the treasury and 49 in the department of the interior.            
@@ -457,20 +457,71 @@ ATO_FRReady_Authorized_Count
 
 #ATO_FRReady_Authorized_Count
 ```
-          
+     
+**Authorization Timelines**     
+Initial Agency and JAB authorizations average amount of time between In-Process_Date and Authorized_Date by Year    
+   
+```{r}
+#JAB ANALYSIS
+ATO_Year_Ini_JAB_Compl_FRIP_FRATO_Time <- Authorization_Log %>%
+  mutate(Path = str_replace_all(Path, "CSP", "Agency")) %>% #replacing any CSP value with Agency so the only values in Path are Agency and JAB
+  filter(!is.na(`FedRAMP_In-Process_Date`) & !is.na(Authorization_Date) & `Leverage_ATO-YN` == "No" & Path == "JAB" & Designation == "Compliant") %>% #filtering based on if FedRAMP_In-Process_Date and Authorization_Date are not blank and initial JAB compliant authorizations
+  group_by(Fiscal_Year, Impact_Level) %>% #grouping by Fiscal_Year and Impact_Level
+  mutate(Time_in_Days_FRIPtoFRA = (Authorization_Date - `FedRAMP_In-Process_Date`)) %>% #finding the time difference 
+  summarise(Time_Median_in_Days_FRIPtoFRA = median(Time_in_Days_FRIPtoFRA), 
+            Time_Mean_in_Days_FRIPtoFRA = mean(Time_in_Days_FRIPtoFRA))
+  
+ATO_Year_Ini_JAB_Compl_FRIP_FRATO_Time 
+
+ATO_Year_Ini_JAB_Compl_FRIP_FRATO_TimeBD <- Authorization_Log %>%
+  mutate(Path = str_replace_all(Path, "CSP", "Agency")) %>% #replacing any CSP value with Agency so the only values in Path are Agency and JAB
+  filter(!is.na(`FedRAMP_In-Process_Date`) & !is.na(Authorization_Date) & `Leverage_ATO-YN` == "No" & Path == "JAB" & Designation == "Compliant") %>% #filtering based on if FedRAMP_In-Process_Date and Authorization_Date are not blank and initial JAB compliant authorizations
+  group_by(Fiscal_Year, Impact_Level) %>% #) %>% #grouping by Fiscal_Year and Impact_Level
+  mutate(Time_in_Days_FRIPtoFRA = (Authorization_Date - `FedRAMP_In-Process_Date`), 
+         Time_Median_in_Days_FRIPtoFRA = median(Time_in_Days_FRIPtoFRA), 
+         Time_Mean_in_Days_FRIPtoFRA = mean(Time_in_Days_FRIPtoFRA)) %>% #finding the time difference 
+  select(Fiscal_Year, Fiscal_Year_ID, CSP, Path, Authorization_Date, `Active-Inactive`, Impact_Level, `FedRAMP_In-Process_Date`, Time_in_Days_FRIPtoFRA, Time_Median_in_Days_FRIPtoFRA, Time_Mean_in_Days_FRIPtoFRA)
+  
+ATO_Year_Ini_JAB_Compl_FRIP_FRATO_TimeBD   
+
+#AGENCY ANALYSIS  
+ATO_Year_Ini_Agency_Compl_FRIP_FRATO_Time <- Authorization_Log %>%
+  mutate(Path = str_replace_all(Path, "CSP", "Agency")) %>% #replacing any CSP value with Agency so the only values in Path are Agency and JAB
+  filter(!is.na(`FedRAMP_In-Process_Date`) & !is.na(Authorization_Date) & `Leverage_ATO-YN` == "No" & Path == "Agency" & Designation == "Compliant") %>% #filtering based on if FedRAMP_In-Process_Date and Authorization_Date are not blank and initial Agency compliant authorizations
+  group_by(Fiscal_Year, Impact_Level) %>% #grouping by Fiscal_Year and Impact_Level
+  mutate(Time_in_Days_FRIPtoFRA = (Authorization_Date - `FedRAMP_In-Process_Date`)) %>% #finding the time difference 
+  summarise(Time_Median_in_Days_FRIPtoFRA = median(Time_in_Days_FRIPtoFRA), 
+            Time_Mean_in_Days_FRIPtoFRA = mean(Time_in_Days_FRIPtoFRA))
+  
+ATO_Year_Ini_Agency_Compl_FRIP_FRATO_Time 
+
+ATO_Year_Ini_Agency_Compl_FRIP_FRATO_TimeBD <- Authorization_Log %>%
+  mutate(Path = str_replace_all(Path, "CSP", "Agency")) %>% #replacing any CSP value with Agency so the only values in Path are Agency and JAB
+  filter(!is.na(`FedRAMP_In-Process_Date`) & !is.na(Authorization_Date) & `Leverage_ATO-YN` == "No" & Path == "Agency" & Designation == "Compliant") %>% #filtering based on if FedRAMP_In-Process_Date and Authorization_Date are not blank and initial Agency compliant authorizations
+  group_by(Fiscal_Year, Impact_Level) %>% #) %>% #grouping by Fiscal_Year and Impact_Level
+  mutate(Time_in_Days_FRIPtoFRA = (Authorization_Date - `FedRAMP_In-Process_Date`), 
+         Time_Median_in_Days_FRIPtoFRA = median(Time_in_Days_FRIPtoFRA), 
+         Time_Mean_in_Days_FRIPtoFRA = mean(Time_in_Days_FRIPtoFRA)) %>% #finding the time difference 
+  select(Fiscal_Year, Fiscal_Year_ID, CSP, Path, Authorization_Date, `Active-Inactive`, Impact_Level, `FedRAMP_In-Process_Date`, Time_in_Days_FRIPtoFRA, Time_Median_in_Days_FRIPtoFRA, Time_Mean_in_Days_FRIPtoFRA)
+  
+ATO_Year_Ini_Agency_Compl_FRIP_FRATO_TimeBD
+```
+
+        
 ##Exporting Data 
     
 ```{r}
 library(openxlsx)
 #exporting the data to make a list with all the data frames created in to the same data set with different sheets
-list_of_datasets <- list("Cleaned" = `Authorization_Log`, 
+list_of_datasets <- list("Original" = `Authorization_Log_Original`,
+                         "Cleaned" = `Authorization_Log`, 
                          "ATO_count" = `ATO_count`, 
                          "ATO_Year_Count" = `ATO_Year_Count`, 
                          "ATO_Year_IL_Count" = `ATO_Year_IL_Count`,
                          "ATO_Year_SM_Count" = `ATO_Year_SM_Count`, 
-                         "ATO_Year_SM_Initial_Count" = `ATO_Year_SM_Initial_Count`, 
-                         "ATO_Year_SM_Active_Initial_Count" = `ATO_Year_SM_Active_Initial_Count`,
-                         "ATO_2018_SM_Active_Initial_Count" = `ATO_2018_SM_Active_Initial_Count`,
+                         "ATO_Year_SM_Intl_Count" = `ATO_Year_SM_Initial_Count`, 
+                         "ATO_Year_SM_Actv_Intl_Count" = `ATO_Year_SM_Active_Initial_Count`,
+                         "ATO_2018_SM_Actv_Intl_Count" = `ATO_2018_SM_Active_Initial_Count`,
                          "ATO_Year_Path_Count" = `ATO_Year_Path_Count`, 
                          "ATO_AvsI_Count" = `ATO_AvsI_Count`, 
                          "ATO_Path_AvsI_Count" = `ATO_Path_AvsI_Count`,
@@ -485,12 +536,16 @@ list_of_datasets <- list("Cleaned" = `Authorization_Log`,
                          "ATO_FRRF_Compliant_AvsI_Count" = `ATO_FRReadyFirst_Compliant_AvsI_Count`,
                          "ATO_FRRF_Compliant_AvsI_Time" = `ATO_FRReadyFirst_Compliant_AvsI_Time`,
                          "ATO_Agencies_Count" = `ATO_Agencies_Count`, 
-                         "ATO_Active_Agencies_Count" = `ATO_Active_Agencies_Count`,
-                         "ATO_InitialReuse_Active_Agencies_Count" = `ATO_InitialReuse_Active_Agencies_Count`, 
-                         "ATO__Agencies_SaaS_Count" = `ATO__Agencies_SaaS_Count`, 
-                         "ATO_Year_SM_InitialReuse_Count" = `ATO_Year_SM_InitialReuse_Count`, 
-                         "ATO_Year_SM_Active_InitialReuse_Count" = `ATO_Year_SM_Active_InitialReuse_Count`,
-                         "ATO_FRReady_Authorized_Count" = `ATO_FRReady_Authorized_Count`) 
+                         "ATO_Actv_Agencies_Count" = `ATO_Active_Agencies_Count`,
+                         "ATO_IntlReuse_Actv_Agencies_Count" = `ATO_InitialReuse_Active_Agencies_Count`, 
+                         "ATO_Agencies_SaaS_Count" = `ATO_Agencies_SaaS_Count`, 
+                         "ATO_Yr_SM_IntlReuse_Count" = `ATO_Year_SM_InitialReuse_Count`, 
+                         "ATO_Yr_SM_Actv_IntlReuse_Count" = `ATO_Year_SM_Active_InitialReuse_Count`,
+                         "ATO_FRReady_Authorized_Count" = `ATO_FRReady_Authorized_Count`,
+                         "ATO_Yr_JAB_FRIP_FRA_Time" = `ATO_Year_Ini_JAB_Compl_FRIP_FRATO_Time`, 
+                         "ATO_Yr_JAB_FRIPF_RA_TimeBD" = `ATO_Year_Ini_JAB_Compl_FRIP_FRATO_TimeBD`, 
+                         "ATO_Yr_Agency_FRIP_FRA_Time" = `ATO_Year_Ini_Agency_Compl_FRIP_FRATO_Time`, 
+                         "ATO_Yr_Agency_FRIP_FRA_TimeBD" = `ATO_Year_Ini_Agency_Compl_FRIP_FRATO_TimeBD`) 
 
 write.xlsx(list_of_datasets, file = "Authorization Log Analysis.xlsx")
 ``` 
